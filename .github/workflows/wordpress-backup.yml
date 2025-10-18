@@ -24,11 +24,6 @@ jobs:
       - name: Ensure posts directory exists
         run: |
           mkdir -p posts
-          if [ ! -f posts/.gitkeep ]; then
-            touch posts/.gitkeep
-            git add posts/.gitkeep
-            git commit -m "Add posts directory" || echo "No changes"
-          fi
 
       - name: Run backup script
         run: python scripts/wp_backup.py
@@ -45,4 +40,3 @@ jobs:
           else
             git commit -m "Auto backup $(date -u +'%Y-%m-%d %H:%M:%S')"
             git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git HEAD:main
-          fi
