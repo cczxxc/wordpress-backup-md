@@ -37,8 +37,8 @@ jobs:
 
       - name: Run backup script with timeout
         run: |
-          # 设置2分钟超时，避免无限等待
-          timeout 120s python scripts/wp_backup.py || echo "脚本执行完成或超时"
+          # 设置3分钟超时，避免无限等待
+          timeout 180s python scripts/wp_backup.py || echo "脚本执行完成或超时"
         env:
           PYTHONUNBUFFERED: 1  # 实时输出日志
 
