@@ -8,71 +8,92 @@ from datetime import datetime
 WORDPRESS_API = "https://xin.a0001.net/wp-json/wp/v2/posts"
 
 OUTPUT_DIR = "posts"
-REQUEST_TIMEOUT = 6  # 秒 # 访问超时时间（秒）
+REQUEST_TIMEOUT = 6  # 秒
 
+def sanitize_filename(filename):
+    """清理文件名中的非法字符"""
+    return re.sub(r'[<>:"/\\|?*]', '_', filename)
 
 def fetch_posts():
     print("🌀 正在从 WordPress 获取文章列表...")
     page = 1
     posts = []
-    while True:
+    max_pages = 10  # 限制最大页数
+    
+    while page <= max_pages:
         try:
+            print(f"📡 请求第 {page} 页...")
             response = requests.get(
                 WORDPRESS_API,
                 params={"per_page": 20, "page": page},
-                timeout=REQUEST_TIMEOUT  # ← 加上超时
+                timeout=REQUEST_TIMEOUT
             )
+            
             if response.status_code == 200:
                 data = response.json()
                 if not data:
+                    print("📄 已到达最后一页")
                     break
+                    
                 posts.extend(data)
-                print(f"✅ 已获取第 {page} 页 ({len(posts)} 篇文章)")
+                print(f"✅ 第 {page} 页获取成功: {len(data)} 篇文章")
                 page += 1
             else:
                 print(f"⚠️ 请求失败: {response.status_code}")
                 break
+                
         except requests.exceptions.Timeout:
-            print(f"⏰ 请求超时（第 {page} 页，已跳过）")
+            print(f"⏰ 第 {page} 页请求超时，跳过...")
             page += 1
-        except requests.exceptions.RequestException as e:
-            print(f"❌ 网络错误（第 {page} 页）: {e}")
+        except Exception as e:
+            print(f"❌ 第 {page} 页错误: {e}")
             break
-    print(f"📦 共获取 {len(posts)} 篇文章。")
+    
+    print(f"📦 共获取 {len(posts)} 篇文章")
     return posts
-
 
 def save_as_markdown(posts):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     print("📝 正在保存为 Markdown 文件...")
+    
+    success_count = 0
     for i, post in enumerate(posts, start=1):
-        title = post.get("title", {}).get("rendered", "无标题")
-        content = post.get("content", {}).get("rendered", "")
-        slug = post.get("slug", f"post-{i}")
-        date = post.get("date", "")
+        try:
+            title = post.get("title", {}).get("rendered", "无标题").strip()
+            content = post.get("content", {}).get("rendered", "")
+            slug = post.get("slug", f"post-{i}").strip()
+            date = post.get("date", "")
 
-        # 构建 Markdown 文件
-        metadata = {
-            "title": title,
-            "date": date,
-            "slug": slug,
-        }
-        fm_post = frontmatter.Post(content, **metadata)
+            # 安全处理文件名
+            safe_slug = sanitize_filename(slug)
+            if not safe_slug:
+                safe_slug = f"post-{i}"
 
-        filepath = os.path.join(OUTPUT_DIR, f"{slug}.md")
-        content_str = frontmatter.dumps(fm_post)
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write(content_str)
+            filepath = os.path.join(OUTPUT_DIR, f"{safe_slug}.md")
+            
+            # 构建内容
+            metadata = {"title": title, "date": date, "slug": slug}
+            fm_post = frontmatter.Post(content, **metadata)
+            
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(frontmatter.dumps(fm_post))
+            
+            success_count += 1
+            print(f"✅ [{i}/{len(posts)}] 已保存: {filepath}")
+            
+        except Exception as e:
+            print(f"❌ 保存第 {i} 篇文章失败: {e}")
+            continue
 
-        print(f"✅ [{i}/{len(posts)}] 已保存: {filepath}")
-
-    print("🎉 所有文章已成功保存！")
-
+    print(f"🎉 保存完成！成功 {success_count}/{len(posts)} 篇")
 
 if __name__ == "__main__":
-    print(f"🚀 开始备份 WordPress 文章 ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})")
-    posts = fetch_posts()
-    if posts:
-        save_as_markdown(posts)
-    else:
-        print("⚠️ 未获取到任何文章。")
+    try:
+        print(f"🚀 开始备份 WordPress 文章")
+        posts = fetch_posts()
+        if posts:
+            save_as_markdown(posts)
+        else:
+            print("⚠️ 未获取到任何文章")
+    except Exception as e:
+        print(f"💥 程序执行出错: {e}")
