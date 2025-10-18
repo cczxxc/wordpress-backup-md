@@ -4,83 +4,75 @@ import frontmatter
 from markdownify import markdownify as md
 from datetime import datetime
 
-# WP_API_BASE = "https://ccweb.byethost10.com/wp-json/wp/v2/posts"
-WP_API_BASE = "https://xin.a0001.net/wp-json/wp/v2/posts"
+# WORDPRESS_API = "https://ccweb.byethost10.com/wp-json/wp/v2/posts"
+WORDPRESS_API = "https://xin.a0001.net/wp-json/wp/v2/posts"
 
 OUTPUT_DIR = "posts"
-REQUEST_TIMEOUT = 6  # 秒
-PER_PAGE = 100        # 每页拉取文章数，最大100
+REQUEST_TIMEOUT = 6  # 秒 # 访问超时时间（秒）
 
 
 def fetch_posts():
-    print("🚀 Fetching posts from WordPress API...")
-    posts = []
+    print("🌀 正在从 WordPress 获取文章列表...")
     page = 1
+    posts = []
     while True:
         try:
-            url = f"{WP_API_BASE}?per_page={PER_PAGE}&page={page}"
-            r = requests.get(url, timeout=REQUEST_TIMEOUT)
-            if r.status_code != 200:
-                print(f"⚠️ HTTP {r.status_code} error, stop fetching.")
+            response = requests.get(
+                WORDPRESS_API,
+                params={"per_page": 20, "page": page},
+                timeout=REQUEST_TIMEOUT  # ← 加上超时
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if not data:
+                    break
+                posts.extend(data)
+                print(f"✅ 已获取第 {page} 页 ({len(posts)} 篇文章)")
+                page += 1
+            else:
+                print(f"⚠️ 请求失败: {response.status_code}")
                 break
-            data = r.json()
-            if not data:
-                break
-            posts.extend(data)
-            print(f"📦 Page {page} fetched ({len(data)} posts)")
-            page += 1
         except requests.exceptions.Timeout:
-            print(f"⏰ Page {page} timeout, skipped")
+            print(f"⏰ 请求超时（第 {page} 页，已跳过）")
             page += 1
         except requests.exceptions.RequestException as e:
-            print(f"❌ Network error: {e}")
+            print(f"❌ 网络错误（第 {page} 页）: {e}")
             break
-    print(f"✅ Total posts fetched: {len(posts)}")
+    print(f"📦 共获取 {len(posts)} 篇文章。")
     return posts
+
 
 def save_as_markdown(posts):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    new_count = 0
-    updated_count = 0
-    skipped_count = 0
+    print("📝 正在保存为 Markdown 文件...")
+    for i, post in enumerate(posts, start=1):
+        title = post.get("title", {}).get("rendered", "无标题")
+        content = post.get("content", {}).get("rendered", "")
+        slug = post.get("slug", f"post-{i}")
+        date = post.get("date", "")
 
-    for i, p in enumerate(posts, start=1):
-        slug = p.get("slug", f"post-{i}")
-        title = p.get("title", {}).get("rendered", "无标题")
-        date = p.get("date", "")
-        link = p.get("link", "")
-        content_html = p.get("content", {}).get("rendered", "")
-        md_content = md(content_html)
+        # 构建 Markdown 文件
+        metadata = {
+            "title": title,
+            "date": date,
+            "slug": slug,
+        }
+        fm_post = frontmatter.Post(content, **metadata)
 
-        post_obj = frontmatter.Post(md_content, title=title, date=date, link=link)
-        file_path = os.path.join(OUTPUT_DIR, f"{slug}.md")
-        content_str = frontmatter.dumps(post_obj)
-
-        if os.path.exists(file_path):
-            with open(file_path, "r", encoding="utf-8") as f:
-                old_content = f.read()
-            if old_content.strip() == content_str.strip():
-                skipped_count += 1
-                print(f"⏭️ [{i}/{len(posts)}] No change: {title[:60]}")
-                continue
-            else:
-                updated_count += 1
-                print(f"✏️ [{i}/{len(posts)}] Updated: {title[:60]}")
-        else:
-            new_count += 1
-            print(f"🆕 [{i}/{len(posts)}] New: {title[:60]}")
-
-        with open(file_path, "w", encoding="utf-8") as f:
+        filepath = os.path.join(OUTPUT_DIR, f"{slug}.md")
+        content_str = frontmatter.dumps(fm_post)
+        with open(filepath, "w", encoding="utf-8") as f:
             f.write(content_str)
 
-    print(f"\n🎉 Backup summary: New: {new_count}, Updated: {updated_count}, Skipped: {skipped_count}")
+        print(f"✅ [{i}/{len(posts)}] 已保存: {filepath}")
+
+    print("🎉 所有文章已成功保存！")
 
 
-print(f"⏰ Backup started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-posts = fetch_posts()
-if posts:
-    save_as_markdown(posts)
-else:
-    print("⚠️ No posts found or API error.")
-print("✅ Backup finished.")
-
+if __name__ == "__main__":
+    print(f"🚀 开始备份 WordPress 文章 ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})")
+    posts = fetch_posts()
+    if posts:
+        save_as_markdown(posts)
+    else:
+        print("⚠️ 未获取到任何文章。")
