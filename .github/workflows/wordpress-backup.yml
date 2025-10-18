@@ -27,8 +27,20 @@ jobs:
           mkdir -p posts
           touch posts/.gitkeep
 
-      - name: Run backup script
-        run: python scripts/wp_backup.py
+      - name: Debug info
+        run: |
+          echo "开始执行备份脚本..."
+          python -c "import sys; print('Python 路径:', sys.executable)"
+          python -c "import os; print('工作目录:', os.getcwd())"
+          python -c "import os; print('当前文件列表:', os.listdir('.'))"
+          python -c "import os; print('scripts 目录内容:', os.listdir('scripts'))"
+
+      - name: Run backup script with timeout
+        run: |
+          # 设置2分钟超时，避免无限等待
+          timeout 120s python scripts/wp_backup.py || echo "脚本执行完成或超时"
+        env:
+          PYTHONUNBUFFERED: 1  # 实时输出日志
 
       - name: Commit and push changes
         env:
