@@ -36,10 +36,12 @@ def save_as_markdown(posts):
 
         post = frontmatter.Post(md_content, title=title, date=date, link=link)
         file_path = os.path.join(OUTPUT_DIR, f"{slug}.md")
+
         with open(file_path, "w", encoding="utf-8") as f:
-            frontmatter.dump(post, f)
+            f.write(frontmatter.dumps(post))   # ✅ 改这里
 
     print(f"✅ Saved {len(posts)} posts to '{OUTPUT_DIR}'")
+
 
 if __name__ == "__main__":
     posts = fetch_posts()
