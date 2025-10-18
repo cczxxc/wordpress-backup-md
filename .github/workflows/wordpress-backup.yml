@@ -3,7 +3,7 @@ name: WordPress Backup
 on:
   schedule:
     - cron: '0 3 * * 1'   # 每周一凌晨3点 UTC
-  workflow_dispatch:      # 手动触发
+  workflow_dispatch:
 
 jobs:
   backup:
@@ -28,13 +28,14 @@ jobs:
             touch posts/.gitkeep
             git add posts/.gitkeep
             git commit -m "Add posts directory" || echo "No changes"
-            git push
           fi
 
       - name: Run backup script
         run: python scripts/wp_backup.py
 
       - name: Commit and push changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -43,5 +44,5 @@ jobs:
             echo "No changes detected, skipping commit."
           else
             git commit -m "Auto backup $(date -u +'%Y-%m-%d %H:%M:%S')"
-            git push
+            git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git HEAD:main
           fi
