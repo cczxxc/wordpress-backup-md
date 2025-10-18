@@ -75,12 +75,12 @@ def save_as_markdown(posts):
 
     print(f"\n🎉 Backup summary: New: {new_count}, Updated: {updated_count}, Skipped: {skipped_count}")
 
-if __name__ == "__main__":
-    print(f"⏰ Backup started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    posts = fetch_posts()
-    if posts:
-        save_as_markdown(posts)
-    else:
-        print("⚠️ No posts found or API error.")
-    print("✅ Backup finished.")
+
+print(f"⏰ Backup started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+posts = fetch_posts()
+if posts:
+    save_as_markdown(posts)
+else:
+    print("⚠️ No posts found or API error.")
+print("✅ Backup finished.")
 
