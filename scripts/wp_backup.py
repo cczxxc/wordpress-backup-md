@@ -9,7 +9,7 @@ WORDPRESS_API = "https://xin.a0001.net/wp-json/wp/v2/posts"
 OUTPUT_DIR = "backup"
 
 # 访问超时时间（秒）
-REQUEST_TIMEOUT = 10
+REQUEST_TIMEOUT = 6
 
 def fetch_posts():
     print("🌀 正在从 WordPress 获取文章列表...")
