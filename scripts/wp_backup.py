@@ -4,7 +4,9 @@ import frontmatter
 from markdownify import markdownify as md
 from datetime import datetime
 import re
-import time
+import urllib.parse
+import unicodedata
+import html
 
 # WORDPRESS_API = "https://ccweb.byethost10.com/wp-json/wp/v2/posts"
 WORDPRESS_API = "https://xin.a0001.net/wp-json/wp/v2/posts"
@@ -12,22 +14,54 @@ WORDPRESS_API = "https://xin.a0001.net/wp-json/wp/v2/posts"
 OUTPUT_DIR = "posts"
 REQUEST_TIMEOUT = 10  # 增加超时时间
 
+
+def decode_slug(slug):
+    """解码 URL 编码的 slug"""
+    try:
+        # 先解码 URL 编码
+        decoded = urllib.parse.unquote(slug)
+        # 再解码 HTML 实体
+        decoded = html.unescape(decoded)
+        return decoded
+    except:
+        return slug
+
+def sanitize_filename(filename):
+    """清理文件名，确保安全"""
+    # 解码
+    filename = decode_slug(filename)
+    
+    # 标准化 Unicode
+    filename = unicodedata.normalize('NFKC', filename)
+    
+    # 替换非法字符
+    filename = re.sub(r'[<>:"/\\|?*\x00-\x1F]', '_', filename)
+    filename = re.sub(r'[\s]+', ' ', filename)  # 保留空格，用空格代替下划线
+    
+    # 限制长度
+    if len(filename) > 100:
+        filename = filename[:100]
+    
+    return filename.strip()
+
 def fetch_posts():
+    """获取所有文章"""
     print("🌀 正在从 WordPress 获取文章列表...")
     
     all_posts = []
     page = 1
-    max_pages = 50  # 安全限制
+    max_pages = 20
     
     while page <= max_pages:
         try:
             print(f"📡 请求第 {page} 页...")
             
-            # 更简单的请求参数
             params = {
                 "page": page,
-                "per_page": 10,  # 减少每页数量
-                "_fields": "id,title,slug,content,date,status"  # 只请求需要的字段
+                "per_page": 10,
+                "status": "publish",  # 只获取已发布的文章
+                "orderby": "date",
+                "order": "desc"
             }
             
             response = requests.get(
@@ -35,8 +69,7 @@ def fetch_posts():
                 params=params,
                 timeout=REQUEST_TIMEOUT,
                 headers={
-                    "User-Agent": "WordPress-Backup-Script/1.0",
-                    "Accept": "application/json"
+                    "User-Agent": "WordPress-Backup-Script/1.0"
                 }
             )
             
@@ -53,32 +86,13 @@ def fetch_posts():
                 all_posts.extend(posts)
                 page += 1
                 
-                # 添加延迟，避免请求过快
-                time.sleep(1)
-                
-            elif response.status_code == 400:
-                print("❌ 400 错误：请求参数可能有问题")
-                print(f"🔧 尝试的 URL: {response.url}")
-                break
-                
-            elif response.status_code == 401:
-                print("❌ 401 错误：需要认证")
-                break
-                
-            elif response.status_code == 404:
-                print("❌ 404 错误：API 端点不存在")
-                break
-                
             else:
                 print(f"❌ 请求失败: {response.status_code}")
-                print(f"📄 响应内容: {response.text[:200]}...")
+                print(f"📄 响应内容: {response.text[:200]}")
                 break
                 
         except requests.exceptions.Timeout:
             print(f"⏰ 第 {page} 页请求超时")
-            break
-        except requests.exceptions.ConnectionError:
-            print(f"🔌 第 {page} 页连接错误")
             break
         except Exception as e:
             print(f"💥 第 {page} 页发生错误: {e}")
@@ -88,6 +102,7 @@ def fetch_posts():
     return all_posts
 
 def save_as_markdown(posts):
+    """保存文章为 Markdown 文件"""
     if not posts:
         print("⚠️ 没有文章可保存")
         return
@@ -98,52 +113,56 @@ def save_as_markdown(posts):
     success_count = 0
     for i, post in enumerate(posts, 1):
         try:
-            # 安全获取数据
+            # 获取文章数据
             post_id = post.get("id", i)
             title_data = post.get("title", {})
             content_data = post.get("content", {})
             
-            title = title_data.get("rendered", f"文章-{post_id}").strip()
+            # 解码标题和内容
+            title = html.unescape(title_data.get("rendered", f"文章-{post_id}"))
             content = content_data.get("rendered", "")
             slug = post.get("slug", f"post-{post_id}")
             date = post.get("date", "")
             
-            # 清理 HTML 标签
+            # 解码 slug 并生成安全文件名
+            decoded_slug = decode_slug(slug)
+            safe_filename = sanitize_filename(decoded_slug)
+            
+            # 如果文件名为空或无效，使用文章ID
+            if not safe_filename or safe_filename == "." or safe_filename == "..":
+                safe_filename = f"post-{post_id}"
+            
+            # 构建文件路径
+            filepath = os.path.join(OUTPUT_DIR, f"{safe_filename}.md")
+            
+            # 转换 HTML 内容到 Markdown
             if content:
-                # 使用 markdownify 转换 HTML 到 Markdown
                 content_md = md(content)
             else:
                 content_md = "暂无内容"
             
-            # 安全文件名
-            safe_slug = re.sub(r'[^\w\-\.]', '_', slug)
-            filename = f"{safe_slug}.md" if safe_slug else f"post-{post_id}.md"
-            filepath = os.path.join(OUTPUT_DIR, filename)
-            
             # 创建 Front Matter
-            metadata = {
-                "title": title,
-                "date": date,
-                "slug": slug,
-                "id": post_id
-            }
-            
-            # 组合内容
-            post_content = f"""---
+            front_matter = f"""---
+id: {post_id}
 title: {title}
 date: {date}
-slug: {slug}
-id: {post_id}
+slug: {decoded_slug}
+original_slug: {slug}
+link: {post.get('link', '')}
+status: {post.get('status', '')}
 ---
 
 {content_md}
 """
             
+            # 保存文件
             with open(filepath, "w", encoding="utf-8") as f:
-                f.write(post_content)
+                f.write(front_matter)
             
             success_count += 1
-            print(f"✅ [{i}/{len(posts)}] 已保存: {filename}")
+            print(f"✅ [{i}/{len(posts)}] 已保存: {safe_filename}.md")
+            print(f"   📄 原始slug: {slug}")
+            print(f"   🔄 解码后: {decoded_slug}")
             
         except Exception as e:
             print(f"❌ 保存文章 {i} 失败: {e}")
@@ -151,28 +170,21 @@ id: {post_id}
     
     print(f"🎉 保存完成！成功 {success_count}/{len(posts)} 篇")
 
-def test_api_connection():
-    """测试 API 连接"""
+def test_connection():
+    """测试连接"""
     print("🔧 测试 API 连接...")
     try:
-        response = requests.get(WORDPRESS_API, timeout=10)
-        print(f"🔍 测试响应: {response.status_code}")
-        if response.status_code == 200:
-            print("✅ API 连接正常")
-            return True
-        else:
-            print(f"❌ API 返回错误: {response.status_code}")
-            print(f"📄 响应头: {dict(response.headers)}")
-            return False
+        response = requests.get(WORDPRESS_API, params={"per_page": 1}, timeout=10)
+        print(f"✅ 连接测试成功: {response.status_code}")
+        return True
     except Exception as e:
-        print(f"💥 连接测试失败: {e}")
+        print(f"❌ 连接测试失败: {e}")
         return False
 
 if __name__ == "__main__":
     print(f"🚀 开始备份 WordPress 文章 ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})")
     
-    # 先测试连接
-    if test_api_connection():
+    if test_connection():
         posts = fetch_posts()
         if posts:
             save_as_markdown(posts)
@@ -180,4 +192,4 @@ if __name__ == "__main__":
         else:
             print("⚠️ 未获取到任何文章")
     else:
-        print("❌ API 连接测试失败，请检查网络和 URL")
+        print("❌ API 连接失败")
