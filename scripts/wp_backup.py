@@ -44,13 +44,17 @@ def sanitize_filename(filename):
     
     return filename.strip()
 
-def fetch_posts():
-    """获取所有文章"""
-    print("🌀 正在从 WordPress 获取文章列表...")
+
+def fetch_posts(days=30):
+    """获取文章（可指定最近天数）"""
+    print(f"🌀 正在获取最近 {days} 天的文章...")
     
     all_posts = []
     page = 1
-    per_page = 100  # 每页最大可设为100，减少请求次数
+    per_page = 100
+    
+    # 计算起始日期
+    since_date = (datetime.now() - timedelta(days=days)).isoformat()
     
     while True:
         try:
@@ -59,6 +63,7 @@ def fetch_posts():
             params = {
                 "page": page,
                 "per_page": per_page,
+                "after": since_date,  # 只获取指定日期之后的文章
                 "status": "publish",
                 "orderby": "date",
                 "order": "desc"
@@ -67,32 +72,31 @@ def fetch_posts():
             response = requests.get(
                 WORDPRESS_API,
                 params=params,
-                timeout=REQUEST_TIMEOUT
+                timeout=REQUEST_TIMEOUT,
+                headers={"User-Agent": "WordPress-Backup-Script/1.0"}
             )
             
-            if response.status_code != 200:
+            if response.status_code == 200:
+                posts = response.json()
+                print(f"📊 第 {page} 页获取到 {len(posts)} 篇文章")
+                
+                if not posts:
+                    print("📄 没有更多文章了")
+                    break
+                    
+                all_posts.extend(posts)
+                
+                # 如果获取的文章数量少于每页数量，说明是最后一页
+                if len(posts) < per_page:
+                    print("📄 已到达最后一页")
+                    break
+                    
+                page += 1
+                
+            else:
                 print(f"❌ 请求失败: {response.status_code}")
                 break
-            
-            posts = response.json()
-            if not posts:  # 空数组表示没有更多文章
-                print("📄 已到达最后一页")
-                break
-            
-            all_posts.extend(posts)
-            print(f"✅ 第 {page} 页: 获取 {len(posts)} 篇文章，总计 {len(all_posts)} 篇")
-            
-            # 如果获取的文章数量少于每页数量，说明是最后一页
-            if len(posts) < per_page:
-                print("📄 已到达最后一页")
-                break
                 
-            page += 1
-            
-            # 添加短暂延迟，避免请求过快
-            import time
-            time.sleep(0.5)
-            
         except requests.exceptions.Timeout:
             print(f"⏰ 第 {page} 页请求超时")
             break
@@ -100,7 +104,7 @@ def fetch_posts():
             print(f"💥 第 {page} 页发生错误: {e}")
             break
     
-    print(f"🎉 备份完成！共获取 {len(all_posts)} 篇文章")
+    print(f"📦 共获取 {len(all_posts)} 篇文章")
     return all_posts
 
 def save_as_markdown(posts):
