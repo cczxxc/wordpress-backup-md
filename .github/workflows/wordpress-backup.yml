@@ -2,8 +2,8 @@ name: WordPress Backup
 
 on:
   schedule:
-    - cron: '0 3 * * 1'   # 每周一凌晨3点（UTC时间）
-  workflow_dispatch:       # 手动触发
+    - cron: '0 3 * * 1'   # 每周一凌晨3点 UTC
+  workflow_dispatch:      # 手动触发
 
 jobs:
   backup:
@@ -21,6 +21,16 @@ jobs:
         run: |
           pip install requests python-frontmatter markdownify
 
+      - name: Ensure posts directory exists
+        run: |
+          mkdir -p posts
+          if [ ! -f posts/.gitkeep ]; then
+            touch posts/.gitkeep
+            git add posts/.gitkeep
+            git commit -m "Add posts directory" || echo "No changes"
+            git push
+          fi
+
       - name: Run backup script
         run: python scripts/wp_backup.py
 
@@ -29,5 +39,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add posts/
-          git commit -m "Auto backup $(date -u +'%Y-%m-%d %H:%M:%S')" || echo "No changes"
-          git push
+          if git diff --cached --quiet; then
+            echo "No changes detected, skipping commit."
+          else
+            git commit -m "Auto backup $(date -u +'%Y-%m-%d %H:%M:%S')"
+            git push
+          fi
