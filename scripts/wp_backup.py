@@ -60,8 +60,10 @@ def save_as_markdown(posts):
         fm_post = frontmatter.Post(content, **metadata)
 
         filepath = os.path.join(OUTPUT_DIR, f"{slug}.md")
+        # ✅ 用 dumps() 返回字符串
+        content_str = frontmatter.dumps(fm_post)
         with open(filepath, "w", encoding="utf-8") as f:
-            frontmatter.dump(fm_post, f)
+            f.write(content_str)
 
         print(f"✅ [{i}/{len(posts)}] 已保存: {filepath}")
 
