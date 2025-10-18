@@ -22,8 +22,10 @@ jobs:
           pip install requests python-frontmatter markdownify
 
       - name: Ensure posts directory exists
+        working-directory: ${{ github.workspace }}
         run: |
           mkdir -p posts
+          touch posts/.gitkeep
 
       - name: Run backup script
         run: python scripts/wp_backup.py
@@ -40,3 +42,4 @@ jobs:
           else
             git commit -m "Auto backup $(date -u +'%Y-%m-%d %H:%M:%S')"
             git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git HEAD:main
+          fi
