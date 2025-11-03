@@ -13,6 +13,7 @@ WORDPRESS_API = "https://xin.a0001.net/wp-json/wp/v2/posts"
 
 OUTPUT_DIR = "docs" # github pages的源文件夹叫docs
 REQUEST_TIMEOUT = 10  # 增加超时时间
+post_days = 300
 
 
 def decode_slug(slug):
@@ -191,7 +192,7 @@ if __name__ == "__main__":
     print(f"🚀 开始备份 WordPress 文章 ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})")
     
     if test_connection():
-        posts = fetch_posts()
+        posts = fetch_posts(days=post_days)
         if posts:
             save_as_markdown(posts)
             print("✅ 备份完成！")
