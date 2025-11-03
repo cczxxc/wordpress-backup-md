@@ -11,7 +11,7 @@ import re
 # WORDPRESS_API = "https://ccweb.byethost10.com/wp-json/wp/v2/posts"
 WORDPRESS_API = "https://xin.a0001.net/wp-json/wp/v2/posts"
 
-OUTPUT_DIR = "posts"
+OUTPUT_DIR = "docs" # github pages的源文件夹叫docs
 REQUEST_TIMEOUT = 10  # 增加超时时间
 
 
