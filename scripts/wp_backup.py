@@ -13,7 +13,7 @@ WORDPRESS_API = "https://xin.a0001.net/wp-json/wp/v2/posts"
 
 OUTPUT_DIR = "docs" # github pages的源文件夹叫docs
 REQUEST_TIMEOUT = 10  # 增加超时时间
-post_days = 300
+post_days = 30
 
 
 def decode_slug(slug):
