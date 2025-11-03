@@ -2,3 +2,11 @@ title: my wp docs
 theme: minima
 baseurl: "/wordpress-backup-md"
 markdown: kramdown
+
+defaults:
+  -
+    scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "page"
