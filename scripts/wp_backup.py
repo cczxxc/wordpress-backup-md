@@ -13,7 +13,7 @@ WORDPRESS_API = "https://xin.a0001.net/wp-json/wp/v2/posts"
 
 OUTPUT_DIR = "docs" # github pages的源文件夹叫docs
 REQUEST_TIMEOUT = 10  # 增加超时时间
-post_days = 30
+post_days = 300
 
 
 def decode_slug(slug):
@@ -133,14 +133,24 @@ def save_as_markdown(posts):
             
             # 解码 slug 并生成安全文件名
             decoded_slug = decode_slug(slug)
-            safe_filename = sanitize_filename(decoded_slug)
-            
-            # 如果文件名为空或无效，使用文章ID
-            if not safe_filename or safe_filename == "." or safe_filename == "..":
-                safe_filename = f"post-{post_id}"
-            
+            safe_slug = sanitize_filename(decoded_slug)
+
+            # 提取文章日期，格式化为 YYYY-MM-DD
+            try:
+                post_date = datetime.fromisoformat(date)
+                date_prefix = post_date.strftime("%Y-%m-%d")
+            except:
+                date_prefix = "1970-01-01"  # 万一没有日期，就用默认
+
+            # 最终文件名 = 日期 + 安全 slug
+            if not safe_slug or safe_slug in [".", ".."]:
+                safe_slug = f"post-{post_id}"
+
+            safe_filename = f"{date_prefix}-{safe_slug}"
+
             # 构建文件路径
             filepath = os.path.join(OUTPUT_DIR, f"{safe_filename}.md")
+
             
             # 转换 HTML 内容到 Markdown
             if content:
